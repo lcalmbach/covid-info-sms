@@ -83,7 +83,7 @@ if __name__ == "__main__":
         if len(records) > 0:
             data = records['records'][0]['fields']
             publish_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
-            print(publish_timestamp, last_update)
+            print(publish_timestamp, last_update, datetime.now())
             if compare_timestamps(publish_timestamp, last_update):
                 # publish_timestamp = cfg.TIMEZONE.localize(publish_timestamp)
                 date_str = f"{datetime.strftime(publish_timestamp, '%d. %B')} {data['time']}"
@@ -95,7 +95,7 @@ if __name__ == "__main__":
                     recipients = get_recipients()
                     if recipients > '':
                         send_message(recipients, message)
-                        last_update = datetime.now()
+                        last_update = publish_timestamp
                 except Exception as ex:
                     print(f'An error occurred: {str(ex)}')
         time.sleep(FREQUENCY_SECS)
