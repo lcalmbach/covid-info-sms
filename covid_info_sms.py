@@ -79,7 +79,6 @@ if __name__ == "__main__":
         #fields from frist record
         if len(records) > 0:
             data = records['records'][0]['fields']
-            print(data)
             publish_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
             print(publish_timestamp, last_update)
             if compare_timestamps(publish_timestamp, last_update):
