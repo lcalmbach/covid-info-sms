@@ -1,1 +1,7 @@
+httplib2==0.18.1
+numpy==1.19.3
+pandas==1.1.3
+python-dateutil==2.8.1
+pytz==2020.1
+six==1.15.0
 textmagic==2.0.3

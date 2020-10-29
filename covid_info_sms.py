@@ -15,12 +15,30 @@ python covid_alert.py 300
 from textmagic.rest import TextmagicRestClient
 from datetime import datetime
 from urllib.request import urlopen
+import pandas as pd
 import json
 import time
 import sys
 import config as cfg
 
-__version__ = '0.1.0'
+
+__version__ = '0.1.1'
+
+def get_recipients() -> str:
+    """
+    reads all recipients from a text file and returns a csv-string
+    """
+
+    recipients = ''
+    try: 
+        url = './recipients.txt'
+        df_recipients = pd.read_csv(url, sep=';', engine='python', header=None, names=['name','mobile'], dtype=str)
+        lst = df_recipients['mobile'].tolist()
+        recipients = ','.join(lst)
+    except Exception as ex:
+        print(f'An error occurred in function get_recipients(): {str(ex)}')
+    finally:
+        return recipients
 
 def get_record(url:str)-> str:
     result = []
@@ -61,17 +79,21 @@ if __name__ == "__main__":
         #fields from frist record
         if len(records) > 0:
             data = records['records'][0]['fields']
+            print(data)
             publish_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
             print(publish_timestamp, last_update)
             if compare_timestamps(publish_timestamp, last_update):
-                date_str =datetime.strftime(publish_timestamp, '%d.%B %H:%M')
+                # publish_timestamp = cfg.TIMEZONE.localize(publish_timestamp)
+                date_str = f"{datetime.strftime(publish_timestamp, '%d. %B')} {data['time']}"
                 try: 
                     message = cfg.TEXT_TEMPLATE.format(date_str, 
                         data['ndiff_conf'], 
                         data['ndiff_deceased']) 
                         #data['current_hosp']) die liegen erst am Nachmittag vor
-                    send_message(cfg.PHONES, message)
-                    last_update = datetime.now()
+                    recipients = get_recipients()
+                    if recipients > '':
+                        send_message(recipients, message)
+                        last_update = datetime.now()
                 except Exception as ex:
                     print(f'An error occurred: {str(ex)}')
         time.sleep(FREQUENCY_SECS)
