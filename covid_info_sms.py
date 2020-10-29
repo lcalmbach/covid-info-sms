@@ -70,7 +70,10 @@ def send_message(recipients: str, text: str):
     
 if __name__ == "__main__":
     FREQUENCY_SECS = int(sys.argv[1])
-    last_update = datetime.now()
+    if len(sys.argv) == 3:
+        last_update = datetime.strptime(sys.argv[2], "%Y-%m-%d %H:%M")
+    else:
+        last_update = datetime(2020,1,1)
     client = TextmagicRestClient(cfg.USERNAME, cfg.TOKEN)
     
     while True:
