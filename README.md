@@ -26,6 +26,6 @@ where:
 - send_error: send text if error occurred in the application (should only be admin, W. Smith in the example)
 
 
-The program is called as `>python covid_info_sms.py <secs> <startdatetime>` where:   
-- <secs>: eg. 300 number of seconds between checks in seconds, if new files are available
-- <startdatetime>: e.g. '2020-10-29 16:00': start comparison date. If the timestamp of the most up to date covid record is found to be more recent than this timestamp, a message is sent to all recipients. If no date is entered, 2020-01-01 is the default value in which case the most recent record is always more recent and an sms message is always sent with the most current record. After sending the sms, the comparison date is set to the timestamp of the most current record and the sending of sms messages will only be triggered if a new record with a more recent timestamp is found. the startdate only controls, whether a message is sent immediately of if the program waits for the next record update.
+The program is called as `>python covid_info_sms.py <secs> <send_initial_msg>` where:   
+- <secs>: eg. 300 number of seconds between checks in seconds, if new files are available. Optional, Default is 300
+- <send_initial_msg>: True if you wish to force a message shen starting the app, this can be useful for testing, so you dont need to wait for a record update. Optional, Default is False.
