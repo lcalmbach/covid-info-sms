@@ -21,10 +21,46 @@ import time
 import sys
 import config as cfg
 
+__version__ = '0.1.2'
+__author__ = 'Lukas Calmbach (lcalmbach@gmail.com)'
 
-__version__ = '0.1.1'
+def get_status(last_record, current_record, send_initial_msg) -> str:
+    """
+    returns the status of the current record as compared to the record retrieved 
+    for the last fetch. if ht erecords are identical, there has been no change, if the timestamp 
+    is newer, there was a new record, if the timestamps are identical but a field has ben updated, 
+    the record was changed.   
 
-def get_recipients() -> str:
+    parameters: 
+    last_record         previous record retrieved
+    current_record      record retrieved now
+    send_initial_msg    force sending of record the first time
+
+    returns:
+    status              returns one of the following status:
+        undefined:          one or both records are empty
+        match:              both records are equal
+        changed:            changes in the record but timestamp is identical
+        new:                timestamp of current record is more recent than previous or send_initial_msg
+                            was set to True
+    """
+
+
+    result = 'new' if send_initial_msg else 'undefined'
+    if send_initial_msg != True and last_record != {} and current_record != {}:
+        if last_record == current_record:
+            result = 'match' 
+        else:
+            last_rec_ts = datetime.strptime(last_record['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
+            current_record_ts = datetime.strptime(current_record['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
+            if (current_record_ts - last_rec_ts).total_seconds() > 0:
+                 result = 'changed' 
+            else:
+                result = 'new' 
+    return result
+    
+
+def get_recipients(status) -> str:
     """
     reads all recipients from a text file and returns a csv-string
     """
@@ -32,30 +68,36 @@ def get_recipients() -> str:
     recipients = ''
     try: 
         url = './recipients.txt'
-        df_recipients = pd.read_csv(url, sep=';', engine='python', header=None, names=['name','mobile'], dtype=str)
-        lst = df_recipients['mobile'].tolist()
+        df_recipients = pd.read_csv(url, sep=';', engine='python', comment = '#', header=0, dtype=str)
+        df_filtered = []
+        if status == 'new':
+            df_filtered = df_recipients.query('send_new == "1"')
+            print(123)
+            print(df_recipients)
+            print(df_filtered)
+        elif status == 'changed':
+            df_filtered = df_recipients.query('send_update == "1"')
+        else:
+            df_filtered = df_recipients.query('send_error == "1"')
+        lst = df_filtered['mobile'].tolist()
         recipients = ','.join(lst)
+        print(recipients)
     except Exception as ex:
         print(f'An error occurred in function get_recipients(): {str(ex)}')
     finally:
         return recipients
 
 def get_record(url:str)-> str:
-    result = []
+    result = {}
     try: 
         jsonurl = urlopen(url)
-        result = json.loads(jsonurl.read())
+        records = json.loads(jsonurl.read())
+        if len(records) > 0:
+            result = records['records'][0]['fields']
     except Exception as ex:
         print(f'An error occurred: {str(ex)}')
     return result
 
-def compare_timestamps(date1, date2):
-    """
-    compares if date1 timestamp is newer than date1 timestamp
-    """
-
-    secs_since_last_publication = (date1 - date2).total_seconds()
-    return (secs_since_last_publication > 0)
 
 def send_message(recipients: str, text: str):
     """
@@ -67,36 +109,70 @@ def send_message(recipients: str, text: str):
         print(text)
     except Exception as ex:
         print(f'An error occurred: {str(ex)}')
-    
-if __name__ == "__main__":
-    FREQUENCY_SECS = int(sys.argv[1])
-    if len(sys.argv) == 3:
-        last_update = datetime.strptime(sys.argv[2], "%Y-%m-%d %H:%M")
-    else:
-        last_update = datetime(2020,1,1)
-    client = TextmagicRestClient(cfg.USERNAME, cfg.TOKEN)
-    
-    while True:
-        # list of records
-        records = get_record(cfg.COVID_URL)
-        #fields from frist record
-        if len(records) > 0:
-            data = records['records'][0]['fields']
-            publish_timestamp = datetime.strptime(data['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
-            print(publish_timestamp, last_update, datetime.now())
-            if compare_timestamps(publish_timestamp, last_update):
-                # publish_timestamp = cfg.TIMEZONE.localize(publish_timestamp)
-                date_str = f"{datetime.strftime(publish_timestamp, '%d. %B')} {data['time']}"
-                try: 
-                    message = cfg.TEXT_TEMPLATE.format(date_str, 
-                        data['ndiff_conf'], 
-                        data['ndiff_deceased']) 
-                        #data['current_hosp']) die liegen erst am Nachmittag vor
-                    recipients = get_recipients()
-                    if recipients > '':
-                        send_message(recipients, message)
-                        last_update = publish_timestamp
-                except Exception as ex:
-                    print(f'An error occurred: {str(ex)}')
-        time.sleep(FREQUENCY_SECS)
 
+def get_message(record) -> str:
+    """
+    returns the message string.
+    todo: change for an update message
+    """
+
+    publish_timestamp = datetime.strptime(record['timestamp'], "%Y-%m-%dT%H:%M:%S+00:00")
+    date_str = f"{datetime.strftime(publish_timestamp, '%d. %B')} {record['time']}"
+    message = ''
+    try: 
+        message = cfg.TEXT_TEMPLATE.format(date_str, 
+            record['ndiff_conf'], 
+            record['ndiff_deceased']) 
+            #record['current_hosp']) die liegen erst am Nachmittag vor        
+    except Exception as ex:
+        print(f'An error occurred: {str(ex)}')
+    return message
+
+def log_start(freq, init_flag):
+    """
+    logs the start parameters to the terminal
+    """
+
+    print(f'Starting app: frequency(s) = {freq}, send initial sms: {init_flag}')
+
+def log_status(record, last_update):
+    """
+    logs the current status to the terminal
+    """
+
+    try:    
+        print(record['timestamp'], last_update, datetime.now())
+    except Exception as ex:
+        print(f'An error occurred in log_status: {str(ex)}')
+
+if __name__ == "__main__":
+    try:
+        FREQUENCY_SECS = int(sys.argv[1])
+        send_initial_msg = bool(sys.argv[2])
+    except:
+        FREQUENCY_SECS = cfg.DEFAULT_FREQUENCY_SECS
+        send_initial_msg = cfg.INITIAL_SEND_MSG_FLAG
+    last_record = get_record(cfg.COVID_URL)
+    log_start(FREQUENCY_SECS, send_initial_msg)
+    client = TextmagicRestClient(cfg.USERNAME, cfg.TOKEN)
+
+    while True:
+        current_record = get_record(cfg.COVID_URL) 
+        if current_record != {}:
+            log_status(current_record, last_record['timestamp'])
+            status = get_status(current_record, last_record, send_initial_msg)
+            send_initial_msg = False
+            if status in ('new', 'changed'):
+                # publish_timestamp = cfg.TIMEZONE.localize(publish_timestamp)
+                message = get_message(current_record)
+                recipients = get_recipients(status)
+                if recipients > '' and message > '':
+                    send_message(recipients, message)
+                    last_record = current_record
+                else:
+                    # todo: send error message to recipients having the send_error flag
+                    pass
+
+        else:
+            print(f'{datetime.now()} : no data found!')
+        time.sleep(FREQUENCY_SECS)
