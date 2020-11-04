@@ -110,7 +110,7 @@ def send_message(recipients: str, text: str):
     except Exception as ex:
         print(f'An error occurred: {str(ex)}')
 
-def get_message(record) -> str:
+def get_message(record, status) -> str:
     """
     returns the message string.
     todo: change for an update message
@@ -120,10 +120,14 @@ def get_message(record) -> str:
     date_str = f"{datetime.strftime(publish_timestamp, '%d. %B')} {record['time']}"
     message = ''
     try: 
-        message = cfg.TEXT_TEMPLATE.format(date_str, 
-            record['ndiff_conf'], 
-            record['ndiff_deceased']) 
-            #record['current_hosp']) die liegen erst am Nachmittag vor        
+        if status == 'new':
+            message = cfg.TEXT_TEMPLATE_NEW.format(date_str, 
+                record['ndiff_conf'], 
+                record['ndiff_deceased']) 
+                #record['current_hosp']) die liegen erst am Nachmittag vor        
+        else:    
+            message = cfg.TEXT_TEMPLATE_CHANGED.format(date_str) 
+            
     except Exception as ex:
         print(f'An error occurred: {str(ex)}')
     return message
@@ -164,7 +168,7 @@ if __name__ == "__main__":
             send_initial_msg = False
             if status in ('new', 'changed'):
                 # publish_timestamp = cfg.TIMEZONE.localize(publish_timestamp)
-                message = get_message(current_record)
+                message = get_message(current_record, status)
                 recipients = get_recipients(status)
                 if recipients > '' and message > '':
                     send_message(recipients, message)
