@@ -125,7 +125,7 @@ def send_message(recipients: str, text: str):
     """
 
     try: 
-        # message = client.messages.create(phones=recipients, text=text)
+        message = client.messages.create(phones=recipients, text=text)
         print(text)
     except Exception as ex:
         print(f'An error occurred: {str(ex)}')
